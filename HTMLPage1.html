@@ -1,0 +1,2563 @@
+﻿<script type="text/javascript" src="/sites/TalentStrategy/GUTS/IndiaTalentStrategy/SiteAssets/jquery-1.11.1.min.js"></script>
+<link href="/sites/TalentStrategy/GUTS/IndiaTalentStrategy/SiteAssets/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+<script src="/sites/TalentStrategy/GUTS/IndiaTalentStrategy/SiteAssets/bootstrap/js/bootstrap.min.js"></script>
+<script type="text/javascript" src='/sites/TalentStrategy/GUTS/IndiaTalentStrategy/SiteAssets/SpWidget/jquery.SPWidgets.js'></script>
+<script type="text/javascript" src="/sites/TalentStrategy/GUTS/IndiaTalentStrategy/SiteAssets/jquery.SPServices-2014.02.js"></script>
+<script type="text/javascript" src="/sites/TalentStrategy/GUTS/IndiaTalentStrategy/SiteAssets/jinqjs.js"></script>
+
+
+<script>
+
+    var clientContext;
+    var user;
+    var curr_user_Email_ID;
+    var user_Config = [];
+    var entr_ID;
+    var siteUrl = '/sites/TalentStrategy/GUTS/IndiaTalentStrategy/';
+    var itemIDs;
+    var themes = [];
+    var select_theme = "";
+    // Make sure the SharePoint script file 'sp.js' is loaded before your
+    // code runs.
+    SP.SOD.executeFunc('sp.js', 'SP.ClientContext', sharePointReady);
+
+    function sharePointReady() {
+        clientContext = SP.ClientContext.get_current();
+        user = clientContext.get_web().get_currentUser();
+
+        clientContext.load(user);
+        clientContext.executeQueryAsync(onQuerySucceeded_GetUser, onQueryFailed);
+    }
+    function onQuerySucceeded_GetUser() {
+
+        curr_user_Email_ID = user.get_email();
+        var e_id = curr_user_Email_ID.split('@');
+        entr_ID = e_id[0];
+       // $("#txtotheremployee").spPeoplePicker();
+
+        get_dte();
+
+
+    }
+    function onQueryFailed(sender, args) {
+        alert('Error: ' + args.get_message());
+    }
+    var curr_dte = [];
+    function get_dte() {
+        $.ajax({
+
+            url: "/sites/TalentStrategy/GUTS/IndiaTalentStrategy/_api/web/lists/getByTitle('IB_StayInterview_Themes')/items?$select=ID,EntID,DTE&$top=5000&$filter=EntID eq '" + entr_ID + "'",
+            type: "GET",
+            headers: {
+                "accept": "application/json;odata=verbose",
+            },
+            success: function (data) {
+                curr_dte = $.map(data.d.results, function (value, index) {
+                    return [value];
+                });
+
+                getThemes();
+
+            },
+            error: function (error) {
+                alert(JSON.stringify(error));
+            }
+        });
+
+    }
+    var theme_option = [];
+    function getThemes() {
+        $.ajax({
+
+            url: "/sites/TalentStrategy/GUTS/IndiaTalentStrategy/_api/web/lists/getByTitle('IB_Stay_Themes')/items?$select=ID,Themes,DTE&$top=5000&",
+            type: "GET",
+            headers: {
+                "accept": "application/json;odata=verbose",
+            },
+            success: function (data) {
+                themes = $.map(data.d.results, function (value, index) {
+                    return [value];
+                });
+
+                themes = new jinqJs()
+                    .from(themes)
+                    .in(curr_dte, 'DTE')
+                    .distinct('Themes')
+                    .select();
+
+                var themeoptions = "<option value=0>----Select----</option>";
+                for (var i = 0; i < themes.length; i++) {
+                    themeoptions += "<option value='" + themes[i].Themes + "'>" + themes[i].Themes + "</option>";
+                }
+                select_theme = "<select class='themeselect' style='width: 80%'>" + themeoptions + "</select>";
+
+                // $(".themes").html(select_theme);
+
+                getthemeoptions();
+            },
+            error: function (error) {
+                alert(JSON.stringify(error));
+            }
+        });
+    }
+    function getthemeoptions() {
+        $.ajax({
+
+            url: "/sites/TalentStrategy/GUTS/IndiaTalentStrategy/_api/web/lists/getByTitle('IB_Theme_Options')/items?$select=ID,Theme,Option&$top=5000",
+            type: "GET",
+            headers: {
+                "accept": "application/json;odata=verbose",
+            },
+            success: function (data) {
+                theme_option = $.map(data.d.results, function (value, index) {
+                    return [value];
+                });
+
+                $("#tablearea").delegate(".themeselect", "change", function () {
+                    var $tds = $(this).closest('tr').find('td');
+                    var theme = $tds.eq(0).find("select").val();
+                    var options = new jinqJs()
+                        .from(theme_option)
+                        .where(function (row, index) {
+                            return (row.Theme == theme);
+                        })
+                        .select();
+                    var themeoptions = "<option value=0>----Select----</option>";
+                    for (var i = 0; i < options.length; i++) {
+                        themeoptions += "<option value='" + options[i].Option + "'>" + options[i].Option + "</option>";
+                    }
+                    themeoptions = "<select class='options' style='width: 80%'>" + themeoptions + "</select>";
+                    $(this).closest('tr').find('.optionyesno').html(themeoptions);
+                });
+
+
+                getDetails();
+            },
+            error: function (error) {
+                alert(JSON.stringify(error));
+            }
+        });
+    }
+
+
+    function getDetails() {
+      //  $("#otheremployees").show();
+        $.ajax({
+
+            url: "/sites/TalentStrategy/GUTS/IndiaTalentStrategy/_api/web/lists/getByTitle('IB_UserConfig')/items?$select=ID,UserEid,managerid,risklevel,UniqueID0,Permission,Gender,Status,RiskPriority&$top=5000",
+            type: "GET",
+            headers: {
+                "accept": "application/json;odata=verbose",
+            },
+            success: function (data) {
+
+
+
+                user_Config = $.map(data.d.results, function (value, index) {
+                    return [value];
+                });
+
+                var temp_user_Config = new jinqJs()
+                    .from(user_Config)
+                    .where(function (row, index) {
+                        return (row.managerid == entr_ID);
+                    })
+                    .distinct('UserEid', 'risklevel', 'Status', 'Gender', 'RiskPriority')
+                    .select();
+
+
+
+
+                var risk_count = new jinqJs()
+                    .from(temp_user_Config)
+                    .groupBy('risklevel', 'Status', 'Gender', 'RiskPriority')
+                    .count('UserEid')
+                    .select();
+
+                var risk_Count_0 = new jinqJs()
+                    .from(risk_count)
+                    .where(function (row, index) {
+                        return (row.Status == 0);
+                    })
+
+                    .select();
+
+
+                var risk_male = new jinqJs()
+                    .from(risk_Count_0)
+                    .where(function (row, index) {
+                        return (row.Gender == "M");
+                    })
+
+                    .select();
+                var risk_female = new jinqJs()
+                    .from(risk_Count_0)
+                    .where(function (row, index) {
+                        return (row.Gender == "F");
+                    })
+
+                    .select();
+                var status_0_risklevels = new jinqJs()
+                    .from(risk_Count_0)
+                    .distinct('risklevel', 'RiskPriority')
+                    .orderBy([{ field: 'RiskPriority', sort: 'asc' }])
+                    .select();
+
+
+
+                var thead_string = ""
+
+                if (status_0_risklevels.length != 0) {
+                    for (var i = 0; i < status_0_risklevels.length; i++) {
+                        thead_string += "<td style='text-align:center !important;'><b>" + status_0_risklevels[i].risklevel + "</b></td>";
+                    }
+                }
+                else {
+                    thead_string += "<td style='text-align:center !important;'>" + "<b>None</b>" + "</td>";
+                }
+
+
+                thead_string = "";
+
+                var thbody = "<tr><td ># Women</td>";
+                for (var i = 0; i < status_0_risklevels.length; i++) {
+
+
+                    var count_based_on_risk = new jinqJs()
+                        .from(risk_female)
+                        .where(function (row, index) {
+                            return (row.risklevel == status_0_risklevels[i].risklevel);
+                        })
+                        .select();
+
+                    if (count_based_on_risk.length > 0) {
+                        var info = "risk=" + count_based_on_risk[0].risklevel + "@status=0@gender=F"
+                        thbody += "<td  style='text-align:center !important;'><div class='numberCircle'><a href='#' data-info='" + info + "' onclick='javascript: getInputSummary(this)'>" + count_based_on_risk[0].UserEid + "</a></div></td>"
+                    }
+                    else {
+                        var info = "risk=" + "" + "@status=0"
+                        thbody += "<td  style='text-align:center !important;'><div class='numberCircle'>0</div></td>"
+                    }
+
+
+
+
+
+                }
+                if (status_0_risklevels.length == 0) {
+                    thbody += "<td  style='text-align:center !important;'><div class='numberCircle'> None </div></td>"
+                }
+
+                thbody += "</tr>";
+                thbody += "<tr><td ># Men</td>";
+
+                for (var i = 0; i < status_0_risklevels.length; i++) {
+
+
+                    var count_based_on_risk = new jinqJs()
+                        .from(risk_male)
+                        .where(function (row, index) {
+                            return (row.risklevel == status_0_risklevels[i].risklevel);
+                        })
+                        .select();
+
+
+
+                    if (count_based_on_risk.length > 0) {
+                        var info = "risk=" + count_based_on_risk[0].risklevel + "@status=0@gender=M"
+                        thbody += "<td  style='text-align:center !important;'><div class='numberCircle'><a href='#' data-info='" + info + "' onclick='javascript: getInputSummary(this)'>" + count_based_on_risk[0].UserEid + "</a></div></td>"
+                    }
+                    else {
+                        var info = "risk=" + "" + "@status=0"
+                        thbody += "<td  style='text-align:center !important;'><div class='numberCircle'>0</div></td>"
+                    }
+
+
+
+
+
+                }
+                if (status_0_risklevels.length == 0) {
+                    thbody += "<td  style='text-align:center !important;'><div class='numberCircle'> None </div></td>"
+                }
+                thbody += "</tr><tr><td>Add Additional Employee</td><td><a href='#' onclick='javascript: showadditional()'>Click Here</a></td></tr></tbody>";
+
+                var table_string = "<table class='table' style='margin-bottom: 0px !important;'>" + thead_string + thbody + "</table>";
+
+
+
+
+
+
+                $('#tablearea_pending').html(table_string);
+
+
+
+
+
+
+                var risk_Count_1 = new jinqJs()
+                    .from(risk_count)
+                    .where(function (row, index) {
+                        return (row.Status == 1);
+                    })
+
+                    .select();
+
+
+
+
+                var risk_male = new jinqJs()
+                    .from(risk_Count_1)
+                    .where(function (row, index) {
+                        return (row.Gender == "M");
+                    })
+
+                    .select();
+                var risk_female = new jinqJs()
+                    .from(risk_Count_1)
+                    .where(function (row, index) {
+                        return (row.Gender == "F");
+                    })
+
+                var risk_additional = new jinqJs()
+                    .from(risk_Count_1)
+                    .where(function (row, index) {
+                        return (row.Gender == "O");
+                    })
+
+                    .select();
+                var status_1_risklevels = new jinqJs()
+                    .from(risk_Count_1)
+                    .distinct('risklevel', 'RiskPriority')
+                    .orderBy([{ field: 'RiskPriority', sort: 'asc' }])
+                    .select();
+
+
+
+                var thead_string = "<thead><tr><td ><b>Employees At Risk</b></td>"
+
+                if (status_1_risklevels.length != 0) {
+                    for (var i = 0; i < status_1_risklevels.length; i++) {
+                        thead_string += "<td  style='text-align:center !important;'><b>" + status_1_risklevels[i].risklevel + "</b></td>";
+                    }
+                }
+                else {
+                    thead_string += "<td style='text-align:center !important;'>" + "<b>None</b>" + "</td>";
+                }
+
+                thead_string = "";
+
+                var thbody = "<tr><td ># Women</td>";
+
+                for (var i = 0; i < status_1_risklevels.length; i++) {
+
+                    var count_based_on_risk = new jinqJs()
+                        .from(risk_female)
+                        .where(function (row, index) {
+                            return (row.risklevel == status_1_risklevels[i].risklevel);
+                        })
+                        .select();
+
+                    if (count_based_on_risk.length > 0) {
+                        var info = "risk=" + count_based_on_risk[0].risklevel + "@status=1@gender=F"
+                        thbody += "<td  style='text-align:center !important;'><div class='numberCircle'><a href='#' data-info='" + info + "' onclick='javascript: getInputSummary(this)'>" + count_based_on_risk[0].UserEid + "</a></div></td>"
+                    }
+                    else {
+                        var info = "risk=" + "" + "@status=0"
+                        thbody += "<td  style='text-align:center !important;'><div class='numberCircle'>0</div></td>"
+                    }
+
+
+
+
+                }
+                if (status_1_risklevels.length == 0) {
+                    thbody += "<td  style='text-align:center !important;'><div class='numberCircle'> None </div></td>"
+                }
+                thbody += "</tr>";
+                thbody += "<tr><td ># Men</td>";
+                for (var i = 0; i < status_1_risklevels.length; i++) {
+
+
+                    var count_based_on_risk = new jinqJs()
+                        .from(risk_male)
+                        .where(function (row, index) {
+                            return (row.risklevel == status_1_risklevels[i].risklevel);
+                        })
+                        .select();
+
+
+
+                    if (count_based_on_risk.length > 0) {
+                        var info = "risk=" + count_based_on_risk[0].risklevel + "@status=1@gender=M"
+                        thbody += "<td  style='text-align:center !important;'><div class='numberCircle'><a href='#' data-info='" + info + "' onclick='javascript: getInputSummary(this)'>" + count_based_on_risk[0].UserEid + "</a></div></td>"
+                    }
+                    else {
+                        var info = "risk=" + "" + "@status=0"
+                        thbody += "<td  style='text-align:center !important;'><div class='numberCircle'>0</div></td>"
+                    }
+
+
+
+                }
+                if (status_1_risklevels.length == 0) {
+                    thbody += "<td  style='text-align:center !important;'><div class='numberCircle'>None </div></td>"
+                }
+                thbody += "</tr>";
+                thbody += "<tr><td ># Additional Added Employees</td>";
+                for (var i = 0; i < status_1_risklevels.length; i++) {
+
+
+                    var count_based_on_risk = new jinqJs()
+                        .from(risk_additional)
+                        .where(function (row, index) {
+                            return (row.risklevel == status_1_risklevels[i].risklevel);
+                        })
+                        .select();
+
+
+
+                    if (count_based_on_risk.length > 0) {
+                        var info = "risk=" + count_based_on_risk[0].risklevel + "@status=1@gender=O"
+                        thbody += "<td  style='text-align:center !important;'><div class='numberCircle'><a href='#' data-info='" + info + "' onclick='javascript: getInputSummary(this)'>" + count_based_on_risk[0].UserEid + "</a></div></td>"
+                    }
+                    else {
+                        var info = "risk=" + "" + "@status=0"
+                        thbody += "<td  style='text-align:center !important;'><div class='numberCircle'>0</div></td>"
+                    }
+
+
+
+                }
+                if (status_1_risklevels.length == 0) {
+                    thbody += "<td  style='text-align:center !important;'><div class='numberCircle'>None </div></td>"
+                }
+                thbody += "</tr></tbody>";
+                var table_string = "<table class='table' style='margin-bottom: 0px !important;'>" + thead_string + thbody + "</table>";
+
+
+                $('#tablearea_completed').html(table_string);
+
+
+
+
+
+
+
+            },
+            error: function (error) {
+                alert(JSON.stringify(error));
+            }
+        });
+    }
+    function showadditional() {
+        $("#pending").hide();
+        $("#completed").hide();
+        $("#otheremployees").show();
+        $("#mydiv_view_edit").hide();
+    }
+    var user_response = [];
+    function getDetails_view() {
+        //  $("#onboardingTableview").find("tr:gt(0)").remove();
+        $.ajax({
+
+            url: "/sites/TalentStrategy/GUTS/IndiaTalentStrategy/_api/web/lists/getByTitle('IB_StayInterviewResponses_New')/items?$select=ID,UserID,Theme,DiscussWithLeadership,POA,Ownership,OrderID,Overall&$top=5000&$filter=UniqueID0 eq '" + $("#drpCompleted").val()+"'",
+            type: "GET",
+            headers: {
+                "accept": "application/json;odata=verbose",
+            },
+            success: function (data) {
+
+
+
+                user_response = $.map(data.d.results, function (value, index) {
+                    return [value];
+                });
+
+
+
+                for (var i = 0; i < user_response.length; i++) {
+                    if (user_response[i].Theme == "Overall") {
+                        document.getElementById("overallremarks_view").value = user_response[i].Overall;
+                    }
+                }
+                var user_temp = new jinqJs()
+                    .from(user_response)
+                    .where(function (row, index) {
+                        return (row.Theme != "Overall");
+                    })
+                    .orderBy([{ field: 'OrderID', sort: 'asc' }])
+                    .select();
+
+
+                //$("#onboardingTableview").delegate(".themeselect", "change", function () {
+                //    var $tds = $(this).closest('tr').find('td');
+                //    var theme = $tds.eq(0).find("select").val();
+                //    var options = new jinqJs()
+                //             .from(theme_option)
+                //             .where(function (row, index) {
+                //                 return (row.Theme == theme);
+                //             })
+                //  .select();
+                //    var themeoptions = "<option value=0>----Select----</option>";
+                //    for (var i = 0; i < options.length; i++) {
+                //        themeoptions += "<option value='" + options[i].Option + "'>" + options[i].Option + "</option>";
+                //    }
+                //    themeoptions = "<select class='options' style='width: 80%'>" + themeoptions + "</select>";
+                //    $(this).closest('tr').find('.optionyesno').html(themeoptions);
+                //});
+                var i = 0;
+                $('#onboardingTableview tbody').children("tr").each(function () {
+
+                    var $tds = $(this).find('td');
+
+                    //var options = new jinqJs()
+                    //   .from(theme_option)
+                    //   .where(function (row, index) {
+                    //       return (row.Theme == user_temp[i].Theme);
+                    //   })
+                    //    .select();
+
+                    //var themeoptions = "<option value=0>----Select----</option>";
+                    //for (var j = 0; j < options.length; j++) {
+                    //    themeoptions += "<option value='" + options[j].Option + "'>" + options[j].Option + "</option>";
+                    //}
+                    //themeoptions = "<select class='options' style='width: 80%'>" + themeoptions + "</select>";
+                    // $(this).closest('tr').find('.optionyesno').html(themeoptions);
+
+                    //                    $tds.eq(0).find("select").val(user_temp[i].Theme);
+                    $tds.eq(1).find("select").val(user_temp[i].DiscussWithLeadership);
+                    $tds.eq(3).find("select").val(user_temp[i].Ownership);
+                    $tds.eq(2).find("input").val(user_response[i].POA);
+
+
+                    i++;
+
+
+                });
+            },
+            error: function (error) {
+                alert(JSON.stringify(error));
+            }
+        });
+    }
+    function addOption(selectbox, text, value) {
+        var optn = document.createElement("OPTION");
+        optn.text = text;
+        optn.value = value;
+        var select = document.getElementById(selectbox);
+        select.add(optn);
+
+    }
+
+    function getInputSummary(thelink) {
+        $("#mydiv_view_edit").hide();
+        $("#otheremployees").hide();
+        $('#tablearea').hide();
+        $('#button_2').hide();
+        $('#button_1').hide();
+        $("#risktable").html("");
+        $("#risktable_view").html("");
+        var tabledata = [];
+        var filteroptions = thelink.getAttribute('data-info');
+
+        var full_String = filteroptions.split("@");
+
+        var risk_string = full_String[0];
+
+        risk_string = risk_string.split("=");
+        var risk = risk_string[1];
+
+        var status_string = full_String[1];
+
+        status_string = status_string.split("=");
+
+        var status = status_string[1];
+
+        var gender = full_String[2];
+        gender = gender.split("=");
+        gender = gender[1];
+
+        var temp_user_Config = new jinqJs()
+            .from(user_Config)
+            .where(function (row, index) {
+                return (row.managerid == entr_ID && row.Status == status && row.risklevel == risk && row.Gender == gender);
+            })
+            .distinct('UserEid', 'UniqueID0')
+            .select();
+        if (status == 0) {
+            $('#pending').show();
+            $('#completed').hide();
+            var selectList = $("#drpPending");
+            selectList.find("option:gt(0)").remove();
+            for (var i = 0; i < temp_user_Config.length; i++) {
+
+                addOption('drpPending', temp_user_Config[i].UserEid, temp_user_Config[i].UniqueID0);
+            }
+        }
+        else if (status == 1) {
+            $('#pending').hide();
+            $('#completed').show();
+            var selectList = $("#drpCompleted");
+            selectList.find("option:gt(0)").remove();
+            for (var i = 0; i < temp_user_Config.length; i++) {
+
+                addOption('drpCompleted', temp_user_Config[i].UserEid, temp_user_Config[i].UniqueID0);
+            }
+        }
+
+
+
+        //console.log(temp_user_Config);
+
+
+    }
+    function delelet_record(thelink) {
+
+        var id = thelink.getAttribute('data-info');
+        if (id != "New")
+            deleteListItem(id);
+        else
+            $(thelink).parent().parent().remove();
+
+
+    }
+
+    function validate() {
+        var flag = 0;
+        var msg = "";
+        var questions = "";
+        $('#onboardingTable tbody').children("tr").each(function () {
+            var $tds = $(this).find('td');
+
+            var user_id = $("#drpPending option:selected").text();
+            //       var theme = $('.themeselect option:selected', $(this)).text();// $tds.eq(0).find("select").val();
+            //$("#drpPending option:selected").text()
+            var POA = $tds.eq(2).find("input").val();
+            var DiscussWithLeadership = $tds.eq(1).find("select").val();
+            var ownership = $tds.eq(3).find("select").val();
+
+            if (POA == "" || DiscussWithLeadership == 0 || ownership == 0) {
+                flag++;
+
+
+            }
+        });
+
+
+
+        if (flag ==0) {
+            alert("Please fill in all the responses correctly");
+
+        }
+        else
+            if ($("#txtotheremployee").val() != '')
+        {
+                addnewitemdynamic();
+        }
+            saveResponse();
+
+    }
+
+    function addnewitemdynamic() {
+        var clientContext = new SP.ClientContext(siteUrl);
+        var oList = clientContext.get_web().get_lists().getByTitle('IB_UserConfig');
+
+        var itemCreateInfo = new SP.ListItemCreationInformation();
+        this.oListItem = oList.addItem(itemCreateInfo);
+
+        oListItem.set_item('Title', $("#txtotheremployee").val() );
+        oListItem.set_item('UserEid', $("#txtotheremployee").val());
+        oListItem.set_item('managerid', entr_ID);
+        oListItem.set_item('Status', '0');
+        oListItem.set_item('risklevel', '1');
+        oListItem.set_item('Gender', 'O');
+        oListItem.set_item('RiskPriority', '1');
+        oListItem.set_item('Permission', '1');
+        oListItem.set_item('CCorS', 'CC');
+        
+        
+
+        oListItem.set_item('UniqueID0', $("#txtotheremployee").val());
+        
+        oListItem.update();
+
+        clientContext.load(oListItem);
+
+        clientContext.executeQueryAsync(Function.createDelegate(this, this.onQuerySucceeded_others), Function.createDelegate(this, this.onQueryFailed_others));
+
+    }
+
+    function onQuerySucceeded_others() {
+        itemIDs = oListItem.get_id();
+      //  alert('Item created: ' + oListItem.get_id());
+    }
+
+    function onQueryFailed_others(sender, args) {
+
+        alert('Request failed. ' + args.get_message() + '\n' + args.get_stackTrace());
+    }
+    function saveResponse() {
+
+        
+        
+         {
+            var clientContext = new SP.ClientContext(siteUrl);
+            var oList = clientContext.get_web().get_lists().getByTitle('IB_StayInterviewResponses_New');
+            this.website = clientContext.get_web();
+
+            this.newItem = null;
+
+            var i = 1;
+            $('#onboardingTable tbody').children("tr").each(function () {
+                var $tds = $(this).find('td');
+
+                var user_id; 
+                var unqiueid;
+                if ($("#drpPending").val() == 0) {
+                    user_id = $("#txtotheremployee").val();
+                    unqiueid = $("#txtotheremployee").val();
+                }
+                else {
+                    unqiueid= $("#drpPending option:selected").val();
+                    user_id = $("#drpPending option:selected").text();
+                }
+
+
+
+                var theme = $tds.eq(0).text();
+
+                var POA = $tds.eq(2).find("input").val();
+                var DiscussWithLeadership = $tds.eq(1).find("select").val();
+                var ownership = $tds.eq(3).find("select").val();
+
+
+                newItem = oList.addItem(new SP.ListItemCreationInformation());
+                newItem.set_item('UserID', user_id);
+                newItem.set_item('Theme', theme);
+                newItem.set_item('DiscussWithLeadership', DiscussWithLeadership);
+                newItem.set_item('ManagerID', entr_ID);
+                newItem.set_item('POA', POA);
+                newItem.set_item('UniqueID0', unqiueid);
+                newItem.set_item('OrderID', i);
+                newItem.set_item('Ownership', ownership);
+                i++;
+                newItem.update();
+
+
+            });
+            clientContext.executeQueryAsync(Function.createDelegate(this, this.onSuccess_addResponsestoList),
+                Function.createDelegate(this, this.onFailure_addResponsestoList));
+        }
+
+    }
+
+
+    function onSuccess_addResponsestoList() {
+
+        UpdateStatus();
+        addoverall();
+
+        $('#pending').hide();
+        $('#completed').hide();
+        $('#tablearea').hide();
+        $('#button_2').hide();
+        $('#button_1').hide();
+
+        $("#risktable").html("");
+
+        var i = 0;
+        $('#onboardingTable tbody').children("tr").each(function () {
+
+            var $tds = $(this).find('td');
+
+
+            $tds.eq(0).find("select").val('0');
+            $tds.eq(1).find("select").val('0');
+            $tds.eq(3).find("select").val('0');
+            $tds.eq(2).find("input").val('');
+
+
+            i++;
+
+
+        });
+
+        //  document.getElementById("overallremarks").innerText = "";
+        alert("Responses added successfully");
+
+
+    }
+
+    function onFailure_addResponsestoList(sender, args) {
+        alert('Request failed. ' + args.get_message() +
+            '\n' + args.get_stackTrace());
+    }
+
+    function addoverall() {
+        var clientContext = new SP.ClientContext(siteUrl);
+        var oList = clientContext.get_web().get_lists().getByTitle('IB_StayInterviewResponses_New');
+        var newItem = null;
+
+
+        var user_id;
+        var unqiueid;
+        if ($("#drpPending").val() == 0) {
+            user_id = $("#txtotheremployee").val();
+            unqiueid = $("#txtotheremployee").val();
+        }
+        else {
+            unqiueid = $("#drpPending option:selected").val();
+            user_id = $("#drpPending option:selected").text();
+        }
+
+        newItem = oList.addItem(new SP.ListItemCreationInformation());
+        newItem.set_item('UserID', user_id);
+        newItem.set_item('Theme', "Overall");
+
+        newItem.set_item('ManagerID', entr_ID);
+
+        newItem.set_item('UniqueID0', unqiueid);
+        newItem.set_item('OrderID', "Overall");
+        newItem.set_item('Overall', $("#overallremarks").val());
+        newItem.update();
+
+        clientContext.executeQueryAsync(Function.createDelegate(this, this.onSuccess_overall),
+            Function.createDelegate(this, this.onFailure));
+    }
+    function onSuccess_overall() {
+
+    }
+    function onFailure_addResponsestoList_overall(sender, args) {
+        alert('Request failed. ' + args.get_message() +
+            '\n' + args.get_stackTrace());
+    }
+    function UpdateStatus() {
+        var clientContext = new SP.ClientContext(siteUrl);
+        var oList = clientContext.get_web().get_lists().getByTitle('IB_UserConfig');
+
+        this.oListItem = oList.getItemById(itemIDs);
+        oListItem.set_item('Status', 1);
+        oListItem.update();
+
+        clientContext.executeQueryAsync(
+            Function.createDelegate(this, this.onQuerySucceeded),
+            Function.createDelegate(this, this.onQueryFailed)
+        );
+    }
+
+    function onQuerySucceeded() {
+       // $("#ttxtotheremployee").val('');
+        getDetails();
+
+    }
+
+    function onQueryFailed(sender, args) {
+        alert('Request failed. ' + args.get_message() +
+            '\n' + args.get_stackTrace());
+    }
+
+
+    function addnewrow() {
+        var table = document.getElementById("tbodyT");
+        var x = document.getElementById("tbodyT").rows.length;
+        var row = table.insertRow(x);
+        var cell0 = row.insertCell(0);
+
+        var cell1 = row.insertCell(1);
+
+        var cell2 = row.insertCell(2);
+
+        var cell3 = row.insertCell(3);
+        var cell4 = row.insertCell(4);
+
+
+
+        cell0.innerHTML = '<div class="themes">' + select_theme + '</div>';
+        cell1.innerHTML = '<div class="optionyesno"><select><option>---Select----</option></select></div>';
+        cell2.innerHTML = ' <input type="text" class="poa" />';
+        cell3.innerHTML = "<select class='ownership'><option value='0'>----Select----</option><option value='Practice Leadership'>Practice Leadership</option><option value='Career Counselor'> Career Counselor</option><option value='Project Manager'> Project Manager</option><option value='HR'> HR</option><option value='Not Applicable'> Not Applicable</option></select>";
+        cell4.innerHTML = "<input type='button' class='remove' value='Remove' />";
+    }
+
+
+    function saveResponse_view() {
+        var clientContext = new SP.ClientContext(siteUrl);
+        var oList = clientContext.get_web().get_lists().getByTitle('IB_StayInterviewResponses_New');
+        this.website = clientContext.get_web();
+
+        var user_temp = new jinqJs()
+            .from(user_response)
+            .where(function (row, index) {
+                return (row.Theme != "Overall");
+            })
+            .orderBy([{ field: 'OrderID', sort: 'asc' }])
+            .select();
+
+        this.newItem = null; var i = 0;
+        $('#onboardingTableview tbody').children("tr").each(function () {
+            var $tds = $(this).find('td');
+            var question = $tds.eq(0).text();
+            var user_id = $("#ccnames option:selected").val();
+            var theme = $tds.eq(0).find("select").val();
+            var DiscussWithLeadership = $tds.eq(1).find("select").val();
+            var POA = $tds.eq(2).find("input").val();
+
+
+
+            var ownership = $tds.eq(3).find("select").val();
+
+
+            newItem = oList.getItemById(user_temp[i].ID);
+
+            i++;
+
+
+            newItem.set_item('Theme', theme);
+            newItem.set_item('DiscussWithLeadership', DiscussWithLeadership);
+            newItem.set_item('Ownership', ownership);
+            newItem.set_item('POA', POA);
+            newItem.update();
+
+
+
+        });
+        clientContext.executeQueryAsync(Function.createDelegate(this, this.onSuccess_addResponsestoList_view),
+            Function.createDelegate(this, this.onFailure_addResponsestoList_view));
+
+
+    }
+    function create_new() {
+        var clientContext = new SP.ClientContext(siteUrl);
+        var oList = clientContext.get_web().get_lists().getByTitle('IB_StayInterviewResponses_New');
+        this.website = clientContext.get_web();
+
+
+        this.newItem = null; var i = 0;
+        var orderid = user_response.length;
+        $('#onboardingTableview tbody').children("tr").each(function () {
+            var $tds = $(this).find('td');
+            var question = $tds.eq(0).text();
+            var user_id = $("#drpCompleted option:selected").val();
+            var theme = $tds.eq(0).find("select").val();
+            var DiscussWithLeadership = $tds.eq(1).find("select").val();
+            var POA = $tds.eq(2).find("input").val();
+            var type = $tds.eq(5).text();
+
+
+            var ownership = $tds.eq(3).find("select").val();
+
+            if (type == "Yes") {
+                var newItem = null;
+
+
+                var user_id = $("#drpCompleted option:selected").text();
+
+                newItem = oList.addItem(new SP.ListItemCreationInformation());
+
+                newItem.set_item('UserID', user_id);
+                newItem.set_item('Theme', theme);
+                newItem.set_item('DiscussWithLeadership', DiscussWithLeadership);
+                newItem.set_item('ManagerID', entr_ID);
+                newItem.set_item('POA', POA);
+                newItem.set_item('UniqueID0', $("#drpCompleted option:selected").val());
+                newItem.set_item('OrderID', orderid);
+                newItem.set_item('Ownership', ownership);
+                newItem.update();
+                orderid++;
+
+            }
+
+        });
+        clientContext.executeQueryAsync(Function.createDelegate(this, this.onSuccess_create_new),
+            Function.createDelegate(this, this.onFailure));
+
+    }
+
+    function onSuccess_overall_new() {
+
+        create_new();
+    }
+    function onSuccess_create_new() {
+        //user_response = [];
+        //getDetails_view();
+        //alert("Saved");
+        save_overall_view();
+    }
+    function onSuccess_addResponsestoList_view() {
+        //addoverall_view();
+        // create_new();
+        //  alert("Responses added successfully");
+        save_overall_view();
+
+    }
+
+    function save_overall_view() {
+        var overall_id = new jinqJs()
+            .from(user_response)
+            .where(function (row, index) {
+                return (row.Theme == "Overall");
+            })
+            .select("ID");
+        //    console.log(overall_id);
+        save_overllall(overall_id[0].ID)
+    }
+    function save_overllall(id) {
+        var clientContext = new SP.ClientContext(siteUrl);
+        var oList = clientContext.get_web().get_lists().getByTitle('IB_StayInterviewResponses_New');
+        this.website = clientContext.get_web();
+
+
+        this.newItem = null; var i = 0;
+
+
+
+        newItem = oList.getItemById(id);
+
+
+
+
+        newItem.set_item('Overall', document.getElementById("overallremarks_view").value);
+        newItem.update();
+        //  console.log(document.getElementById("overallremarks_view").value);
+
+        clientContext.executeQueryAsync(Function.createDelegate(this, this.onSuccess_addResponsestoList_view_overall),
+            Function.createDelegate(this, this.onFailure_addResponsestoList_view));
+    }
+
+    function onSuccess_addResponsestoList_view_overall() {
+        //addoverall_view();
+        // save_overall_view();
+        alert("Responses added successfully");
+        $("#getInputSummary").hide();
+        $("#mydiv_view_edit").hide();
+    }
+
+    function onFailure_addResponsestoList_view(sender, args) {
+        alert('Request failed. ' + args.get_message() +
+            '\n' + args.get_stackTrace());
+    }
+    function addoverall_view() {
+        var clientContext = new SP.ClientContext(siteUrl);
+        var oList = clientContext.get_web().get_lists().getByTitle('IB_StayInterviewResponses_New');
+        var newItem = null;
+
+
+        var user_id = $("#drpPending option:selected").text();
+
+        newItem = oList.addItem(new SP.ListItemCreationInformation());
+        newItem.set_item('UserID', user_id);
+        newItem.set_item('Theme', "Overall");
+
+        newItem.set_item('ManagerID', entr_ID);
+
+        newItem.set_item('UniqueID0', $("#drpPending option:selected").val());
+        newItem.set_item('OrderID', "Overall");
+        newItem.set_item('Overall', $("#overallremarks").val());
+        newItem.update();
+
+        clientContext.executeQueryAsync(Function.createDelegate(this, this.onSuccess_overall),
+            Function.createDelegate(this, this.onFailure));
+    }
+</script>
+<script>
+    function deleteListItem(itemId) {
+
+
+        var x = document.getElementById("onboardingTableview").rows.length;
+        if ((x - 1) <= 1) {
+            alert("Number of rows cannot be less than 1");
+        }
+
+        else {
+            var clientContext = new SP.ClientContext(siteUrl);
+            var oList = clientContext.get_web().get_lists().getByTitle('IB_StayInterviewResponses_New');
+
+            this.oListItem = oList.getItemById(itemId);
+
+            oListItem.deleteObject();
+
+            clientContext.executeQueryAsync(Function.createDelegate(this, this.onQuerySucceededDelete), Function.createDelegate(this, this.onQueryFailedDelete));
+        }
+
+    }
+
+    function onQuerySucceededDelete() {
+
+        alert('Record Deleted');
+        user_response = [];
+        getDetails_view();
+    }
+
+    function onQueryFailedDelete(sender, args) {
+
+        alert('Request failed. ' + args.get_message() + '\n' + args.get_stackTrace());
+    }
+
+    function add_new_view() {
+        var newRow = "<tr><td>" + select_theme + "</td><td>" + '<div class="optionyesno"><select><option>---Select----</option></select></div>' + "</td><td><div>" + "<input type='text' value='' class='poa'/> " + "</div></td><td><div>" + "<select class='ownership'><option value='0'>----Select----</option><option value='Practice Leadership'>Practice Leadership</option><option value='Career Counselor'> Career Counselor</option><option value='Project Manager'> Project Manager</option><option value='HR'> HR</option><option value='Not Applicable'> Not Applicable</option></select>" + "</div></td><td><a href='#' data-info='" + "New" + "' onclick='javascript: delelet_record(this)'>" + "Delete" + "</a></td><td>Yes<td></tr>";
+
+
+        $("#onboardingTableview").append(newRow);
+    }
+
+    function validate_validate() {
+        var flag = 0;
+        var msg = "";
+        var questions = "";
+        $('#onboardingTableview tbody').children("tr").each(function () {
+            var $tds = $(this).find('td');
+
+            var user_id = $("#drpPending option:selected").text();
+            var theme = $('.themeselect option:selected', $(this)).text();// $tds.eq(0).find("select").val();
+            //$("#drpPending option:selected").text()
+            var POA = $tds.eq(2).find("input").val();
+            var DiscussWithLeadership = $tds.eq(1).find("select").val();
+            var ownership = $tds.eq(3).find("select").val();
+
+            if (POA == "" || DiscussWithLeadership == 0 || ownership == 0) {
+                flag++;
+
+
+            }
+        });
+
+
+
+        if (flag == 0) {
+            alert("Please fill in all the responses correctly");
+
+        }
+        else
+            saveResponse_view();
+        $("#completed").hide();
+    //    $("#otheremployees").show();
+
+
+    }
+</script>
+
+
+
+<style>
+    .boxContainer {
+        height: 150px;
+        width: 150px;
+        position: relative;
+        margin-top: 2px;
+        margin-left: 2px;
+        margin-right: 2px;
+    }
+
+    .tableHolder {
+        margin-left: auto;
+        margin-right: auto;
+        width: 43%;
+    }
+
+    #DeltaSiteLogo {
+        display: none;
+    }
+
+    #DeltaPlaceHolderPageTitleInTitleArea {
+        display: none;
+    }
+
+    .boxContainer2 {
+        height: 150px;
+        width: 150px;
+        position: relative;
+    }
+
+    .boxContainer3 {
+        height: 150px;
+        width: 150px;
+        position: relative;
+    }
+
+    .boxContainer4 {
+        height: 150px;
+        width: 150px;
+        position: relative;
+    }
+
+    .boxContainer .MenuBox {
+        text-overflow: ellipsis;
+        overflow: hidden;
+        width: 150px;
+        height: 150px;
+        background-color: #021F27;
+        position: absolute;
+        display: block;
+        top: 0;
+        left: 0;
+        font-family: Helvetica;
+    }
+
+    .boxContainer2 .MenuBox2 {
+        text-overflow: ellipsis;
+        overflow: hidden;
+        width: 150px;
+        height: 150px;
+        background-color: blue;
+        position: absolute;
+        display: block;
+        top: 0;
+        left: 0;
+        font-family: Helvetica;
+    }
+
+    .boxContainer3 .MenuBox3 {
+        text-overflow: ellipsis;
+        overflow: hidden;
+        width: 150px;
+        height: 150px;
+        background-color: #A985CD;
+        position: absolute;
+        display: block;
+        top: 0;
+        left: 0;
+        font-family: Helvetica;
+    }
+
+    .boxContainer4 .MenuBox4 {
+        text-overflow: ellipsis;
+        overflow: hidden;
+        width: 150px;
+        height: 150px;
+        background-color: #BA9DD7;
+        position: absolute;
+        display: block;
+        top: 0;
+        left: 0;
+        font-family: Helvetica;
+    }
+
+    .iconImage img {
+        width: 90px;
+        height: 90px;
+        margin-left: auto;
+        margin-right: auto;
+        display: block;
+        margin-top: 10px;
+    }
+
+    .provisionImage img {
+        width: 70px;
+        height: 70px;
+        margin-left: auto;
+        margin-right: auto;
+        display: block;
+        margin-top: 10px;
+    }
+
+    #serviceCatalogue {
+        margin-top: 40px;
+    }
+
+    .serviceLineContent {
+        display: none;
+    }
+
+    p, h2 {
+        /* color: rgb(236,198,152);*/
+        color: rgb(255, 255, 255) !important;
+        text-align: center;
+    }
+
+    h3 {
+        font-size: 1em;
+        font-weight: bold;
+    }
+
+    #auxilary_table {
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    #ContactUs {
+        margin-left: auto;
+        margin-right: auto;
+        width: 100px;
+        height: 50px;
+        font-family: 'Segoe UI', Frutiger, 'Frutiger Linotype', 'Dejavu Sans', 'Helvetica Neue', Arial, sans-serif;
+        font-style: normal;
+        font-variant: normal;
+        margin-top: 10px;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    #catalogueHeader {
+        width: auto;
+        height: 50px;
+        background-color: #592C66;
+        font-family: 'Segoe UI', Frutiger, 'Frutiger Linotype', 'Dejavu Sans', 'Helvetica Neue', Arial, sans-serif;
+        font-style: normal;
+        font-variant: normal;
+        font-weight: 500;
+        font-size: 24pt;
+    }
+
+    #catalogueHeader {
+        font-size: 24pt;
+    }
+
+    #catlogueBox {
+        width: 100%;
+        background-color: #FFE5F6;
+        padding-bottom: 5px;
+    }
+
+    .Box {
+        display: block;
+        width: auto;
+    }
+
+    .Board {
+        width: 300px;
+        height: 200px;
+        position: absolute;
+    }
+
+    #homeText {
+        font-size: 12pt;
+        height: auto;
+        width: 1000px;
+        margin-right: auto;
+        margin-left: auto;
+        text-align: center;
+        font-family: 'Segoe UI', Frutiger, 'Frutiger Linotype', 'Dejavu Sans', 'Helvetica Neue', Arial, sans-serif;
+        font-style: normal;
+        font-variant: normal;
+        padding-top: 5px;
+    }
+
+    #homeBox {
+        width: auto;
+        height: 100px;
+        margin-top: 5px;
+        background-color: #C671E2;
+    }
+
+    #legalText {
+        margin-top: 20px;
+        font-size: 10pt;
+        font-family: 'Segoe UI', Frutiger, 'Frutiger Linotype', 'Dejavu Sans', 'Helvetica Neue', Arial, sans-serif;
+        font-style: normal;
+        font-variant: normal;
+        text-align: center;
+    }
+
+    #globalNavBox {
+        display: none;
+    }
+
+    /*..ms-cui-tts
+    {
+        display:none !important;
+    }*/
+    #s4-titlerow {
+        display: none !important;
+    }
+
+    #sideNavBox {
+        display: none !important;
+        background-color: blue;
+    }
+
+    #contentBox {
+        margin-left: 0px !important;
+        margin-top: -40px !important;
+    }
+
+    body {
+        /*      background-image: url('/sites/DEIAnalytics/DEIAnalyticsProject/SiteAssets/homepage.jpg') !important;*/
+        background-repeat: repeat !important;
+        background-size: inherit;
+        font-size: 13px !important;
+    }
+
+    .ms-core-overlay {
+        background: none !important;
+    }
+</style>
+<script>
+
+    $(document).ready(function () {
+        $('#pending').hide();
+        $('#completed').hide();
+        $('#tablearea').hide();
+        $('#button_2').hide();
+        $('#button_1').hide();
+        $("#mydiv_view_edit").hide();
+        var selectList = $("#drpCompleted");
+        selectList.find("option:gt(0)").remove();
+        var selectList = $("#drpPending");
+        selectList.find("option:gt(0)").remove();
+        $('#drpPending').change(function () {
+            var temp_user_Config = new jinqJs()
+                .from(user_Config)
+                .where(function (row, index) {
+                    return (row.UniqueID0 == $("#drpPending option:selected").val());
+                })
+                .select('ID');
+            itemIDs = temp_user_Config[0].ID;
+
+        });
+
+        $("#tablearea").delegate(".remove", "click", function () {
+            var x = document.getElementById("onboardingTable").rows.length;
+            if ((x - 1) <= 1) {
+                alert("Number of rows cannot be less than 1");
+            }
+
+            else {
+                $(this).parent().parent().remove();
+            }
+
+
+        });
+    });
+
+    function show_table_area() {
+        if (($("#drpPending").val()) == 0) {
+          //  console.log(($("#txtotheremployee").text()));
+            alert("Please select one employee");
+        }
+        else {
+            ClearAll();
+        //    get_risk_tableinfo();
+            $('#tablearea').show();
+            $('#button_2').show();
+            $('#button_1').show();
+        }
+        
+    }
+    function show_table_area_other() {
+        if (( ($("#txtotheremployee").val()) == '')) {
+            //  console.log(($("#txtotheremployee").text()));
+            alert("Please enter one employee");
+        }
+        else {
+            //console.log($("#txtotheremployee").val());
+            ClearAll();
+          //  get_risk_tableinfo();
+            $('#tablearea').show();
+            $('#button_2').show();
+            $('#button_1').show();
+        }
+
+    }
+    function view_edit() {
+        if (($("#drpCompleted").val()) == 0) {
+            alert("Please select one employee");
+        }
+        else {
+
+            //  window.open("/sites/TalentStrategy/GUTS/IndiaTalentStrategy/SitePages/StayInterviewView.aspx?IDs=" + $("#drpCompleted option:selected").val(), '_blank');
+            $("#mydiv_view_edit").show();
+            getDetails_view();
+            //get_risk_tableinfo_view();
+        }
+    }
+
+    function get_risk_tableinfo() {
+
+     
+    }
+    function ClearAll() {
+        //$("#onboardingTable").find("tr:gt(0)").remove();
+        //get_dte();
+        $('#tablearea').find('input:text').val('');
+        $('#tablearea').find('select').val(0);
+       // $('#otheremployees').find('input:text').val('');
+    }
+    function get_risk_tableinfo_view() {
+
+       
+    }
+</script>
+
+<style>
+    #risktable.table > tbody > tr > td, #risktable.table > tbody > tr > th, #risktable.table > tfoot > tr > td, #risktable.table > tfoot > tr > th, #risktable.table > thead > tr > td, #risktable.table > thead > tr > th {
+        line-height: 1 !important;
+    }
+    body { 
+    /*background-image: url('/sites/TalentStrategy/GUTS/IndiaTalentStrategy/SiteAssets/testimage2.png') !important; 
+    background-repeat:no-repeat !important;*/
+
+
+}
+</style>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-3" style="width:15% !important;">
+
+        </div>
+        <div class="col-md-6" style=" width: 70%;">
+            <div class="row" style=" margin-bottom: 20px;">
+                <div class="col-md-12">
+                    <div>
+                        <img src="/sites/TalentStrategy/GUTS/IndiaTalentStrategy/SiteAssets/ibbanner.jpg" />
+                    </div>
+                </div>
+
+                <div style="margin-left: 27%; margin-top: 14%; font-size: 15px !important; ">
+                    <a href="/sites/TalentStrategy/GUTS/IndiaTalentStrategy/SitePages/IB_StayInterview_Manager.aspx">Click here to view dashboard for employees in your span</a>
+                </div>
+                <div style="margin-left: 90%; margin-bottom: -2%; font-size: 11.5px; ">
+                    <a href="/sites/TalentStrategy/GUTS/IndiaTalentStrategy/SiteAssets/UserManual_StayInterview_IB_TalentStrategy.pdf" target="_blank">User Guide</a>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-12">
+                    <table>
+                        <thead style="background-color: cornflowerblue;color: white;">
+                            <tr>
+
+                                <td style="width: 600px; height: 39px;"><div style="margin-left: 30%;font-weight:900 !important;">  Awaiting Discussion</div></td>
+                                <td style=" border-left: 1px solid rgba(0, 0, 0, 0.11); width: 600px; height: 39px; "><div style="margin-left: 22%;font-weight:900 !important;"> Discussion Completed</div></td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style=" border-bottom: 1px solid rgba(0, 0, 0, 0.11);">
+                                    <div id="tablearea_pending"></div>
+                                </td>
+                                <td style="border-left: 1px solid rgba(0, 0, 0, 0.11); border-bottom: 1px solid rgba(0, 0, 0, 0.11); ">
+
+                                    <div id="tablearea_completed"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div style="float: right; margin-top: 1%; font-size: 11.5px; font-weight: 600;">Click on the numbers to view details</div>
+                </div>
+
+            </div><br /><br /><br />
+
+            <div class="row">
+                <div class="col-md-12">
+                    <div style="margin-left: 46%; margin-top: -20px; ">
+
+                        <div id="pending">
+
+                            <div style=" margin-left: -70%; margin-bottom: 2%;">
+                                <table>
+                                    <tr>
+                                        <td style="width:300px;">
+                                            Please select an employee and click on add
+                                        </td>
+                                        <td style="width:200px;">
+                                            <select id="drpPending"><option value="0">---Select----</option></select>
+                                        </td>
+                                        <td>
+                                            <input type="button" id="btnpending" value="Add" onclick="show_table_area();" />
+                                        </td>
+                                    </tr>
+                                    <!--<tr>
+                        <td style="width:300px;">
+                            To add other employees :
+                        </td>
+                        <td style="width:200px;">
+                            <input type="text" id="txtotheremployee" />
+                        </td>
+                        <td>
+                            <input type="button" id="btnpending" value="Add" onclick="show_table_area();" />
+                        </td>
+                    </tr>-->
+                                </table>
+                            </div>
+
+
+                        </div>
+                        <div id="completed">
+
+                            <div style=" margin-left: -70%; margin-bottom: 2%;">
+                                <table>
+                                    <tr>
+                                        <td style="width:300px;">
+                                            Please select an employee and click on view
+                                        </td>
+                                        <td style="width:200px;">
+                                            <select id="drpCompleted"><option value="0">---Select----</option></select>
+                                        </td>
+                                        <td>
+                                            <input type="button" id="btncompleted" value="View" onclick="view_edit();" />
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+
+
+                        </div>
+
+                    </div>
+                    <div id="otheremployees" style="display:none !important;">
+                        <table>
+                            <tr>
+                                <td style="width:300px;">
+                                    To add other employees :
+                                </td>
+                                <td style="width:200px;">
+                                    <input type="text" id="txtotheremployee" />
+                                </td>
+                                <td>
+                                    <input type="button" id="btnpending" value="Add" onclick="show_table_area_other();" />
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <br />
+                    <div id="tablearea">
+                        <table id="onboardingTable" class="table">
+                            <thead style="background-color: cornflowerblue;color: white;">
+                                <tr>
+
+
+                                    <td><div style=" font-size: 13px !important;">Risk Indicators</div></td>
+
+                                    <td><div style=" font-size: 13px !important;">Risk Insights</div></td>
+                                    <td><div style=" font-size: 13px !important;">Plan of Action</div></td>
+                                    <td><div style=" font-size: 13px !important;">Owner</div></td>
+
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyT">
+                                <tr>
+                                    <td>
+                                        <div class="themes">Job and Role</div>
+                                    </td>
+
+                                    <td>
+                                        <div class="optionyesno">
+                                            <select style='width: 80%'>
+                                                <option>---Select----</option>
+                                                <option value='Satisfied with job/role'>Satisfied with job/role</option>
+                                                <option value='Expressing dissatisfaction first time'>Expressing dissatisfaction first time</option>
+                                                <option value='Expressed dissatisfaction multiple times in the last 6 months'>Expressed dissatisfaction multiple times in the last 6 months</option>
+                                                <option value='Job/role is not in line with my expectation/aspiration/experience'>Job/role is not in line with my expectation/aspiration/experience</option>
+                                                <option value='Urgently looking for a job/role change'>Urgently looking for a job/role change</option>
+
+
+
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="poa" />
+                                    </td>
+                                    <td>
+                                        <select class="ownership">
+                                            <option value="0">----Select----</option>
+                                            <option value='Supervisor'>Supervisor</option>
+                                            <option value='Skip Supervisor'>Skip Supervisor</option>
+                                            <option value='Career Counselor'> Career Counselor</option>
+                                            <option value='Function lead'> Function lead</option>
+                                            <option value='People Advisor'> People Advisor</option>
+                                            <option value='Employee'> Employee</option>
+                                            <option value='Not Applicable'> Not Applicable</option>
+                                        </select>
+                                    </td>
+
+                                </tr>
+
+                                <tr>
+                                    <td>
+                                        <div class="themes">
+                                            Engagement
+
+
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="optionyesno">
+                                            <select style='width: 80%'>
+                                                <option>---Select----</option>
+                                                <option value='Always feels engaged and motivated'>Always feels engaged and motivated</option>
+                                                <option value='Sometimes feels disengaged and/or demotivated'>Sometimes feels disengaged and/or demotivated</option>
+                                                <option value='Always feels disengaged and/or demotivated'>Always feels disengaged and/or demotivated</option>
+
+
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="poa" />
+                                    </td>
+                                    <td>
+                                        <select class="ownership">
+                                            <option value="0">----Select----</option>
+                                            <option value='Supervisor'>Supervisor</option>
+                                            <option value='Skip Supervisor'>Skip Supervisor</option>
+                                            <option value='Career Counselor'> Career Counselor</option>
+                                            <option value='Function lead'> Function lead</option>
+                                            <option value='People Advisor'> People Advisor</option>
+                                            <option value='Employee'> Employee</option>
+                                            <option value='Not Applicable'> Not Applicable</option>
+                                        </select>
+                                    </td>
+
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="themes">
+                                            Supervisor
+
+
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="optionyesno">
+                                            <select style='width: 80%'>
+                                                <option>---Select----</option>
+                                                <option value='No issues with supervisor'>No issues with supervisor</option>
+                                                <option value='Concerns raised regarding supervisor first time'>Concerns raised regarding supervisor first time</option>
+                                                <option value='Concerns raised regarding supervisor multiple times'>Concerns raised regarding supervisor multiple times</option>
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="poa" />
+                                    </td>
+                                    <td>
+                                        <select class="ownership">
+                                            <option value="0">----Select----</option>
+                                            <option value='Supervisor'>Supervisor</option>
+                                            <option value='Skip Supervisor'>Skip Supervisor</option>
+                                            <option value='Career Counselor'> Career Counselor</option>
+                                            <option value='Function lead'> Function lead</option>
+                                            <option value='People Advisor'> People Advisor</option>
+                                            <option value='Employee'> Employee</option>
+                                            <option value='Not Applicable'> Not Applicable</option>
+                                        </select>
+                                    </td>
+
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="themes">
+                                            Learning
+
+
+
+
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="optionyesno">
+                                            <select style='width: 80%'>
+                                                <option>---Select----</option>
+                                                <option value='Satisfied with learning curve/involved in projects outside my work'>Satisfied with learning curve/involved in projects outside my work</option>
+                                                <option value='Explored some internal/external learning opportunity'>Explored some internal/external learning opportunity</option>
+                                                <option value='Did not explore any learning opportunity in last 12 months'>Did not explore any learning opportunity in last 12 months</option>
+                                                <option value='Looking for higher education'>Looking for higher education</option>
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="poa" />
+                                    </td>
+                                    <td>
+                                        <select class="ownership">
+                                            <option value="0">----Select----</option>
+                                            <option value='Supervisor'>Supervisor</option>
+                                            <option value='Skip Supervisor'>Skip Supervisor</option>
+                                            <option value='Career Counselor'> Career Counselor</option>
+                                            <option value='Function lead'> Function lead</option>
+                                            <option value='People Advisor'> People Advisor</option>
+                                            <option value='Employee'> Employee</option>
+                                            <option value='Not Applicable'> Not Applicable</option>
+                                        </select>
+                                    </td>
+
+                                </tr>
+
+                                <tr>
+                                    <td>
+                                        <div class="themes">
+                                            Recognition
+
+
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="optionyesno">
+                                            <select style='width: 80%'>
+                                                <option>---Select----</option>
+                                                <option value='Received recognition in last 6 months'>Received recognition in last 6 months</option>
+                                                <option value='Did not receive recognition in last 6 months'>Did not receive recognition in last 6 months</option>
+                                                <option value='Did not receive recognition in last 1 year'>Did not receive recognition in last 1 year</option>
+
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="poa" />
+                                    </td>
+                                    <td>
+                                        <select class="ownership">
+                                            <option value="0">----Select----</option>
+                                            <option value='Supervisor'>Supervisor</option>
+                                            <option value='Skip Supervisor'>Skip Supervisor</option>
+                                            <option value='Career Counselor'> Career Counselor</option>
+                                            <option value='Function lead'> Function lead</option>
+                                            <option value='People Advisor'> People Advisor</option>
+                                            <option value='Employee'> Employee</option>
+                                            <option value='Not Applicable'> Not Applicable</option>
+                                        </select>
+                                    </td>
+
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="themes">
+                                            Compensation
+
+
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="optionyesno">
+                                            <select style='width: 80%'>
+                                                <option>---Select----</option>
+                                                <option value='Satisfied with compensation and benefits'>Satisfied with compensation and benefits</option>
+                                                <option value='Minor dissatisfaction with compensation and benefits'>Minor dissatisfaction with compensation and benefits</option>
+                                                <option value='Major dissatisfaction with compensation and benefits'>Major dissatisfaction with compensation and benefits</option>
+
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="poa" />
+                                    </td>
+                                    <td>
+                                        <select class="ownership">
+                                            <option value="0">----Select----</option>
+                                            <option value='Supervisor'>Supervisor</option>
+                                            <option value='Skip Supervisor'>Skip Supervisor</option>
+                                            <option value='Career Counselor'> Career Counselor</option>
+                                            <option value='Function lead'> Function lead</option>
+                                            <option value='People Advisor'> People Advisor</option>
+                                            <option value='Employee'> Employee</option>
+                                            <option value='Not Applicable'> Not Applicable</option>
+                                        </select>
+                                    </td>
+
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="themes">
+                                            Talent Action
+
+
+
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="optionyesno">
+                                            <select style='width: 80%'>
+                                                <option>---Select----</option>
+                                                <option value='Satisfied with last talent action/outcome'>Satisfied with last talent action/outcome</option>
+                                                <option value='Seeks clarity on last talent action/outcome'>Seeks clarity on last talent action/outcome</option>
+                                                <option value='Does not agree with last talent action/outcome'>Does not agree with last talent action/outcome</option>
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="poa" />
+                                    </td>
+                                    <td>
+                                        <select class="ownership">
+                                            <option value="0">----Select----</option>
+                                            <option value='Supervisor'>Supervisor</option>
+                                            <option value='Skip Supervisor'>Skip Supervisor</option>
+                                            <option value='Career Counselor'> Career Counselor</option>
+                                            <option value='Function lead'> Function lead</option>
+                                            <option value='People Advisor'> People Advisor</option>
+                                            <option value='Employee'> Employee</option>
+                                            <option value='Not Applicable'> Not Applicable</option>
+                                        </select>
+                                    </td>
+
+                                </tr>
+
+                                <tr>
+                                    <td>
+                                        <div class="themes">
+                                            Promotion
+
+
+
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="optionyesno">
+                                            <select style='width: 80%'>
+                                                <option>---Select----</option>
+                                                <option value='Satisfied with promotion timelines'>Satisfied with promotion timelines</option>
+                                                <option value='Minor dissatisfaction with promotion timeline and reason'>Minor dissatisfaction with promotion timeline and reason</option>
+                                                <option value='Major dissatisfaction with promotion timeline and reason'>Major dissatisfaction with promotion timeline and reason</option>
+
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="poa" />
+                                    </td>
+                                    <td>
+                                        <select class="ownership">
+                                            <option value="0">----Select----</option>
+                                            <option value='Supervisor'>Supervisor</option>
+                                            <option value='Skip Supervisor'>Skip Supervisor</option>
+                                            <option value='Career Counselor'> Career Counselor</option>
+                                            <option value='Function lead'> Function lead</option>
+                                            <option value='People Advisor'> People Advisor</option>
+                                            <option value='Employee'> Employee</option>
+                                            <option value='Not Applicable'> Not Applicable</option>
+                                        </select>
+                                    </td>
+
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="themes">
+                                            Feedback
+
+
+
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="optionyesno">
+                                            <select style='width: 80%'>
+                                                <option>---Select----</option>
+                                                <option value='Gets ongoing feedback from supervisor'>Gets ongoing feedback from supervisor</option>
+                                                <option value='Got feedback once in the last 6 months'>Got feedback once in the last 6 months</option>
+                                                <option value='Got feedback once in the last 12 months'>Got feedback once in the last 12 months</option>
+                                                <option value='Did not receive feedback in the last 12 months'>Did not receive feedback in the last 12 months</option>
+
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="poa" />
+                                    </td>
+                                    <td>
+                                        <select class="ownership">
+                                            <option value="0">----Select----</option>
+                                            <option value='Supervisor'>Supervisor</option>
+                                            <option value='Skip Supervisor'>Skip Supervisor</option>
+                                            <option value='Career Counselor'> Career Counselor</option>
+                                            <option value='Function lead'> Function lead</option>
+                                            <option value='People Advisor'> People Advisor</option>
+                                            <option value='Employee'> Employee</option>
+                                            <option value='Not Applicable'> Not Applicable</option>
+                                        </select>
+                                    </td>
+
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="themes">
+                                            Work Life Balance
+
+
+
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="optionyesno">
+                                            <select style='width: 80%'>
+                                                <option>---Select----</option>
+                                                <option value='Satisfied with work life balance'>Satisfied with work life balance</option>
+                                                <option value='Minor dissatisfaction in last 3 months'>Minor dissatisfaction in last 3 months</option>
+                                                <option value='Extreme dissatisfaction in last 3 months'>Extreme dissatisfaction in last 3 months</option>
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="poa" />
+                                    </td>
+                                    <td>
+                                        <select class="ownership">
+                                            <option value="0">----Select----</option>
+                                            <option value='Supervisor'>Supervisor</option>
+                                            <option value='Skip Supervisor'>Skip Supervisor</option>
+                                            <option value='Career Counselor'> Career Counselor</option>
+                                            <option value='Function lead'> Function lead</option>
+                                            <option value='People Advisor'> People Advisor</option>
+                                            <option value='Employee'> Employee</option>
+                                            <option value='Not Applicable'> Not Applicable</option>
+                                        </select>
+                                    </td>
+
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="themes">
+                                            Personal Concerns
+
+
+
+
+
+
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="optionyesno">
+                                            <select style='width: 80%'>
+                                                <option>---Select----</option>
+                                                <option value='No personal issues highlighted'>No personal issues highlighted</option>
+                                                <option value='Minor personal issues highlighted, manageble at present'>Minor personal issues highlighted, manageble at present</option>
+                                                <option value='Major personal issues highlighted, may exit in 3-6 months'>Major personal issues highlighted, may exit in 3-6 months</option>
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="poa" />
+                                    </td>
+                                    <td>
+                                        <select class="ownership">
+                                            <option value="0">----Select----</option>
+                                            <option value='Supervisor'>Supervisor</option>
+                                            <option value='Skip Supervisor'>Skip Supervisor</option>
+                                            <option value='Career Counselor'> Career Counselor</option>
+                                            <option value='Function lead'> Function lead</option>
+                                            <option value='People Advisor'> People Advisor</option>
+                                            <option value='Employee'> Employee</option>
+                                            <option value='Not Applicable'> Not Applicable</option>
+                                        </select>
+                                    </td>
+
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div style="margin-top:2%;">
+                            Overall Remarks (If Any) : <input type="text" id="overallremarks" style=" width: 80%;" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row" id="button_1">
+                <div class="col-md-12" style="height:50px"></div>
+            </div>
+            <div class="row" id="button_2">
+                <div class="col-md-10">
+                    <!--<input id="btnAddNew" type="button" style="color:#fff;background-color: #337ab7; border-color: #2e6da4;" value="Add New Row" onclick="addnewrow();" />-->
+                </div>
+                <div class="col-md-1">
+                    <input id="btnSubmit" type="button" style="color:#fff;background-color: #337ab7; border-color: #2e6da4;" value="Submit" onclick="validate();" />
+                </div>
+                <div class="col-md-1">
+                    <input id="btnSubmit" type="button" style="color:#fff;background-color: #337ab7; border-color: #2e6da4;" value="Reset" onclick="ClearAll()" />
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12">
+                    <div id="risktable" style="margin-top:5%;">
+
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3" style=" width: 10%;"></div>
+    </div>
+
+</div>
+
+<div class="container" id="mydiv_view_edit">
+    <div class="row" style="margin-top:-0px;">
+        <div class="col-md-9">
+
+
+        </div>
+        <div class="col-md-3">
+
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-3" style="width:15% !important;">
+
+        </div>
+        <div class="col-md-6" style=" width: 70%;">
+            <div id="tablearea">
+                <table id="onboardingTableview" class="table">
+                    <thead style="background-color: cornflowerblue;color: white;">
+                        <tr>
+
+
+                            <td><div style=" font-size: 13px !important;">Risk Indicators</div></td>
+
+                            <td><div style=" font-size: 13px !important;">Risk Insights</div></td>
+                            <td><div style=" font-size: 13px !important;">Plan of Action</div></td>
+                            <td><div style=" font-size: 13px !important;">Owner</div></td>
+
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyT">
+                        <tr>
+                            <td>
+                                <div class="themes">Job and Role</div>
+                            </td>
+
+                            <td>
+                                <div class="optionyesno">
+                                    <select style='width: 80%'>
+                                        <option>---Select----</option>
+                                        <option value='Satisfied with job/role'>Satisfied with job/role</option>
+                                        <option value='Expressing dissatisfaction first time'>Expressing dissatisfaction first time</option>
+                                        <option value='Expressed dissatisfaction multiple times in the last 6 months'>Expressed dissatisfaction multiple times in the last 6 months</option>
+                                        <option value='Job/role is not in line with my expectation/aspiration/experience'>Job/role is not in line with my expectation/aspiration/experience</option>
+                                        <option value='Urgently looking for a job/role change'>Urgently looking for a job/role change</option>
+
+
+
+                                    </select>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="text" class="poa" />
+                            </td>
+                            <td>
+                                <select class="ownership">
+                                    <option value="0">----Select----</option>
+                                    <option value='Supervisor'>Supervisor</option>
+                                    <option value='Skip Supervisor'>Skip Supervisor</option>
+                                    <option value='Career Counselor'> Career Counselor</option>
+                                    <option value='Function lead'> Function lead</option>
+                                    <option value='People Advisor'> People Advisor</option>
+                                    <option value='Employee'> Employee</option>
+                                    <option value='Not Applicable'> Not Applicable</option>
+                                </select>
+                            </td>
+
+                        </tr>
+
+                        <tr>
+                            <td>
+                                <div class="themes">
+                                    Engagement
+
+
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="optionyesno">
+                                    <select style='width: 80%'>
+                                        <option>---Select----</option>
+                                        <option value='Always feels engaged and motivated'>Always feels engaged and motivated</option>
+                                        <option value='Sometimes feels disengaged and/or demotivated'>Sometimes feels disengaged and/or demotivated</option>
+                                        <option value='Always feels disengaged and/or demotivated'>Always feels disengaged and/or demotivated</option>
+
+
+                                    </select>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="text" class="poa" />
+                            </td>
+                            <td>
+                                <select class="ownership">
+                                    <option value="0">----Select----</option>
+                                    <option value='Supervisor'>Supervisor</option>
+                                    <option value='Skip Supervisor'>Skip Supervisor</option>
+                                    <option value='Career Counselor'> Career Counselor</option>
+                                    <option value='Function lead'> Function lead</option>
+                                    <option value='People Advisor'> People Advisor</option>
+                                    <option value='Employee'> Employee</option>
+                                    <option value='Not Applicable'> Not Applicable</option>
+                                </select>
+                            </td>
+
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="themes">
+                                    Supervisor
+
+
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="optionyesno">
+                                    <select style='width: 80%'>
+                                        <option>---Select----</option>
+                                        <option value='No issues with supervisor'>No issues with supervisor</option>
+                                        <option value='Concerns raised regarding supervisor first time'>Concerns raised regarding supervisor first time</option>
+                                        <option value='Concerns raised regarding supervisor multiple times'>Concerns raised regarding supervisor multiple times</option>
+                                    </select>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="text" class="poa" />
+                            </td>
+                            <td>
+                                <select class="ownership">
+                                    <option value="0">----Select----</option>
+                                    <option value='Supervisor'>Supervisor</option>
+                                    <option value='Skip Supervisor'>Skip Supervisor</option>
+                                    <option value='Career Counselor'> Career Counselor</option>
+                                    <option value='Function lead'> Function lead</option>
+                                    <option value='People Advisor'> People Advisor</option>
+                                    <option value='Employee'> Employee</option>
+                                    <option value='Not Applicable'> Not Applicable</option>
+                                </select>
+                            </td>
+
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="themes">
+                                    Learning
+
+
+
+
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="optionyesno">
+                                    <select style='width: 80%'>
+                                        <option>---Select----</option>
+                                        <option value='Satisfied with learning curve/involved in projects outside my work'>Satisfied with learning curve/involved in projects outside my work</option>
+                                        <option value='Explored some internal/external learning opportunity'>Explored some internal/external learning opportunity</option>
+                                        <option value='Did not explore any learning opportunity in last 12 months'>Did not explore any learning opportunity in last 12 months</option>
+                                        <option value='Looking for higher education'>Looking for higher education</option>
+                                    </select>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="text" class="poa" />
+                            </td>
+                            <td>
+                                <select class="ownership">
+                                    <option value="0">----Select----</option>
+                                    <option value='Supervisor'>Supervisor</option>
+                                    <option value='Skip Supervisor'>Skip Supervisor</option>
+                                    <option value='Career Counselor'> Career Counselor</option>
+                                    <option value='Function lead'> Function lead</option>
+                                    <option value='People Advisor'> People Advisor</option>
+                                    <option value='Employee'> Employee</option>
+                                    <option value='Not Applicable'> Not Applicable</option>
+                                </select>
+                            </td>
+
+                        </tr>
+
+                        <tr>
+                            <td>
+                                <div class="themes">
+                                    Recognition
+
+
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="optionyesno">
+                                    <select style='width: 80%'>
+                                        <option>---Select----</option>
+                                        <option value='Received recognition in last 6 months'>Received recognition in last 6 months</option>
+                                        <option value='Did not receive recognition in last 6 months'>Did not receive recognition in last 6 months</option>
+                                        <option value='Did not receive recognition in last 1 year'>Did not receive recognition in last 1 year</option>
+
+                                    </select>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="text" class="poa" />
+                            </td>
+                            <td>
+                                <select class="ownership">
+                                    <option value="0">----Select----</option>
+                                    <option value='Supervisor'>Supervisor</option>
+                                    <option value='Skip Supervisor'>Skip Supervisor</option>
+                                    <option value='Career Counselor'> Career Counselor</option>
+                                    <option value='Function lead'> Function lead</option>
+                                    <option value='People Advisor'> People Advisor</option>
+                                    <option value='Employee'> Employee</option>
+                                    <option value='Not Applicable'> Not Applicable</option>
+                                </select>
+                            </td>
+
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="themes">
+                                    Compensation
+
+
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="optionyesno">
+                                    <select style='width: 80%'>
+                                        <option>---Select----</option>
+                                        <option value='Satisfied with compensation and benefits'>Satisfied with compensation and benefits</option>
+                                        <option value='Minor dissatisfaction with compensation and benefits'>Minor dissatisfaction with compensation and benefits</option>
+                                        <option value='Major dissatisfaction with compensation and benefits'>Major dissatisfaction with compensation and benefits</option>
+
+                                    </select>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="text" class="poa" />
+                            </td>
+                            <td>
+                                <select class="ownership">
+                                    <option value="0">----Select----</option>
+                                    <option value='Supervisor'>Supervisor</option>
+                                    <option value='Skip Supervisor'>Skip Supervisor</option>
+                                    <option value='Career Counselor'> Career Counselor</option>
+                                    <option value='Function lead'> Function lead</option>
+                                    <option value='People Advisor'> People Advisor</option>
+                                    <option value='Employee'> Employee</option>
+                                    <option value='Not Applicable'> Not Applicable</option>
+                                </select>
+                            </td>
+
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="themes">
+                                    Talent Action
+
+
+
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="optionyesno">
+                                    <select style='width: 80%'>
+                                        <option>---Select----</option>
+                                        <option value='Satisfied with last talent action/outcome'>Satisfied with last talent action/outcome</option>
+                                        <option value='Seeks clarity on last talent action/outcome'>Seeks clarity on last talent action/outcome</option>
+                                        <option value='Does not agree with last talent action/outcome'>Does not agree with last talent action/outcome</option>
+                                    </select>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="text" class="poa" />
+                            </td>
+                            <td>
+                                <select class="ownership">
+                                    <option value="0">----Select----</option>
+                                    <option value='Supervisor'>Supervisor</option>
+                                    <option value='Skip Supervisor'>Skip Supervisor</option>
+                                    <option value='Career Counselor'> Career Counselor</option>
+                                    <option value='Function lead'> Function lead</option>
+                                    <option value='People Advisor'> People Advisor</option>
+                                    <option value='Employee'> Employee</option>
+                                    <option value='Not Applicable'> Not Applicable</option>
+                                </select>
+                            </td>
+
+                        </tr>
+
+                        <tr>
+                            <td>
+                                <div class="themes">
+                                    Promotion
+
+
+
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="optionyesno">
+                                    <select style='width: 80%'>
+                                        <option>---Select----</option>
+                                        <option value='Satisfied with promotion timelines'>Satisfied with promotion timelines</option>
+                                        <option value='Minor dissatisfaction with promotion timeline and reason'>Minor dissatisfaction with promotion timeline and reason</option>
+                                        <option value='Major dissatisfaction with promotion timeline and reason'>Major dissatisfaction with promotion timeline and reason</option>
+
+                                    </select>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="text" class="poa" />
+                            </td>
+                            <td>
+                                <select class="ownership">
+                                    <option value="0">----Select----</option>
+                                    <option value='Supervisor'>Supervisor</option>
+                                    <option value='Skip Supervisor'>Skip Supervisor</option>
+                                    <option value='Career Counselor'> Career Counselor</option>
+                                    <option value='Function lead'> Function lead</option>
+                                    <option value='People Advisor'> People Advisor</option>
+                                    <option value='Employee'> Employee</option>
+                                    <option value='Not Applicable'> Not Applicable</option>
+                                </select>
+                            </td>
+
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="themes">
+                                    Feedback
+
+
+
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="optionyesno">
+                                    <select style='width: 80%'>
+                                        <option>---Select----</option>
+                                        <option value='Gets ongoing feedback from supervisor'>Gets ongoing feedback from supervisor</option>
+                                        <option value='Got feedback once in the last 6 months'>Got feedback once in the last 6 months</option>
+                                        <option value='Got feedback once in the last 12 months'>Got feedback once in the last 12 months</option>
+                                        <option value='Did not receive feedback in the last 12 months'>Did not receive feedback in the last 12 months</option>
+
+                                    </select>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="text" class="poa" />
+                            </td>
+                            <td>
+                                <select class="ownership">
+                                    <option value="0">----Select----</option>
+                                    <option value='Supervisor'>Supervisor</option>
+                                    <option value='Skip Supervisor'>Skip Supervisor</option>
+                                    <option value='Career Counselor'> Career Counselor</option>
+                                    <option value='Function lead'> Function lead</option>
+                                    <option value='People Advisor'> People Advisor</option>
+                                    <option value='Employee'> Employee</option>
+                                    <option value='Not Applicable'> Not Applicable</option>
+                                </select>
+                            </td>
+
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="themes">
+                                    Work Life Balance
+
+
+
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="optionyesno">
+                                    <select style='width: 80%'>
+                                        <option>---Select----</option>
+                                        <option value='Satisfied with work life balance'>Satisfied with work life balance</option>
+                                        <option value='Minor dissatisfaction in last 3 months'>Minor dissatisfaction in last 3 months</option>
+                                        <option value='Extreme dissatisfaction in last 3 months'>Extreme dissatisfaction in last 3 months</option>
+                                    </select>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="text" class="poa" />
+                            </td>
+                            <td>
+                                <select class="ownership">
+                                    <option value="0">----Select----</option>
+                                    <option value='Supervisor'>Supervisor</option>
+                                    <option value='Skip Supervisor'>Skip Supervisor</option>
+                                    <option value='Career Counselor'> Career Counselor</option>
+                                    <option value='Function lead'> Function lead</option>
+                                    <option value='People Advisor'> People Advisor</option>
+                                    <option value='Employee'> Employee</option>
+                                    <option value='Not Applicable'> Not Applicable</option>
+                                </select>
+                            </td>
+
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="themes">
+                                    Personal Concerns
+
+
+
+
+
+
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="optionyesno">
+                                    <select style='width: 80%'>
+                                        <option>---Select----</option>
+                                        <option value='No personal issues highlighted'>No personal issues highlighted</option>
+                                        <option value='Minor personal issues highlighted, manageble at present'>Minor personal issues highlighted, manageble at present</option>
+                                        <option value='Major personal issues highlighted, may exit in 3-6 months'>Major personal issues highlighted, may exit in 3-6 months</option>
+                                    </select>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="text" class="poa" />
+                            </td>
+                            <td>
+                                <select class="ownership">
+                                    <option value="0">----Select----</option>
+                                    <option value='Supervisor'>Supervisor</option>
+                                    <option value='Skip Supervisor'>Skip Supervisor</option>
+                                    <option value='Career Counselor'> Career Counselor</option>
+                                    <option value='Function lead'> Function lead</option>
+                                    <option value='People Advisor'> People Advisor</option>
+                                    <option value='Employee'> Employee</option>
+                                    <option value='Not Applicable'> Not Applicable</option>
+                                </select>
+                            </td>
+
+                        </tr>
+                    </tbody>
+                </table>
+                <div style="margin-top:2%;">
+                    Overall Remarks (If Any) : <input type="text" id="overallremarks_view" style=" width: 78%;" />
+                </div>
+            </div>
+
+            <div class="col-md-3" style=" width: 10%;"></div>
+        </div>
+        <div class="row">
+            <div class="col-md-12" style="height:50px"></div>
+        </div>
+        <div class="row">
+            <div class="col-md-10"></div>
+            <div class="col-md-2">
+                <!--<input id="btnaddNew" type="button" style="color:#fff;background-color: #337ab7; border-color: #2e6da4;" value="Add New" onclick="add_new_view();" />-->
+                <input id="btnSubmit" type="button" style="color:#fff;background-color: #337ab7; border-color: #2e6da4;" value="Submit" onclick="validate_validate();" />
+            </div>
+
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <div id="risktable_view" style="margin-top: 5%; width: 70%; margin-left: 15%;">
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
